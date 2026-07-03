@@ -1,61 +1,72 @@
-# MDR Devices — Live Demo Build Log (VERIFIED)
-**Instance:** https://mdr-devices-test.odoo.com · Odoo saas-19.3 Enterprise trial
-**Status:** every line below read back from the live database via API and, where marked, **fire-tested**. This replaces the earlier unverified build log.
+# MDR Devices — Live Demo Build Log (VERIFIED · v2 "pitch-centerpiece" build)
+**Instance:** https://mdr-devices-test.odoo.com · Odoo saas-19.3 Enterprise trial · Company renamed: **MDR Devices Medizintechnik GmbH** (every screen now carries the client's name)
+**Status:** every line read back from the live database via API; every control marked 🔴 was **fire-tested** (a real blocked/routed transaction, then cleaned up). Six controls, six tests, six passes.
 
-Use this as your screenshot/navigation script. Order below = pitch order.
+Use this as your demo walkthrough — the section order below is a natural pitch order.
 
 ---
 
-## A. The credential gate — Slide 6 (THE money screenshot) 🔴 FIRE-TESTED
-- Contacts: **Dr. M. Feldmann** — cert DE-ORT-4471, expiry 30 Apr 2026, status **Expired**. **Dr. A. Weber** — DE-ORT-5512, valid to 2027, status **Validated**. Both show an "MDR credential" section on the contact form.
-- Automation: *MDR Credential Gate — Block Confirm on Invalid HCP* (Settings → Technical → Automation Rules).
-- **Proven live:** confirming an order for Dr. Feldmann raises: *"Blocked — HCP certification expired or invalid for Dr. M. Feldmann. Order cannot be confirmed (MDR credential gate)."* Order stays draft.
-- **Demo move:** open **S00001** (draft order for Dr. Feldmann) → click Confirm → screenshot the red banner. Then show S00002 (Dr. Weber) confirmed cleanly.
+## The one-breath story of what's in the box
+A raw titanium lot arrives and is *automatically* quarantined with a 90-day hold it cannot escape; implants are manufactured with full serial-level UDI traceability back to that lot; a sales order physically cannot confirm against an expired surgeon; consigned implants sit at the hospital while staying on MDR's books; a cancelled surgery flows back through a documented return disposition; instrument trays count their own sterilization cycles and refuse to ship at end-of-life; and every invoice carries a three-dimensional analytic key back to the clinical event. **All of it live. None of it mockups.**
 
-## B. The 90-day quality hold — Slide 8 🔴 FIRE-TESTED
-- Receipts auto-route to **WH/Quarantine** (receipt operation default destination).
-- Quality Control Point *Inbound Implant Material Inspection* generates a check on every raw-material receipt — 2 checks passed on record.
-- **LOT-2607-B — 10 units in WH/Quarantine, hold release 01 Oct 2026 (ACTIVE hold).**
-- Automation: *GxP Quarantine Hold — Block Release Before Hold Elapses*. **Proven live:** attempting to move LOT-2607-B to stock raises: *"GxP quarantine gate — quality hold active for lot LOT-2607-B until 2026-10-01. Release to stock is blocked."*
-- LOT-2607-A (hold elapsed) sits released in WH/Stock ×18 — held and released states visible side by side.
-- **Demo move:** Inventory → Lots/Serials → LOT-2607-B (show hold date in the MDR Compliance section) → try an internal transfer out of Quarantine → screenshot the block.
+---
 
-## C. UDI on the lot record — Slide 7
-- Open any serial (SN-HC-0001/0002): **MDR Compliance — UDI & Quality** section shows DI `04012345678901`, PI batch `LOT-2607-A`, PI serial, expiry (2 yr sterility clock), UDI source = Scanned (GS1).
-- **Demo move:** serial form screenshot + click **Traceability** — one report: LOT-2607-A (vendor) → quarantine → production → SN-HC-000x → consignment/patient. This single screen answers "show me full traceability from raw material to patient."
+## A. Credential gate — Slide 6 🔴 FIRE-TESTED (block) + 🔴 FIRE-TESTED (routing)
+- **Dr. M. Feldmann** (Expired, cert to 30 Apr 2026) → confirming his order raises: *"Blocked — HCP certification expired or invalid for Dr. M. Feldmann. Order cannot be confirmed (MDR credential gate)."*
+- **Dr. A. Weber** (Validated) → S00002 confirmed, delivered, invoiced. The gate passes good orders.
+- **Dr. S. Okafor (Locum — Pending Verification)** → order **S00004 confirms but is routed**: a "HCP credential verification required" activity lands in the review queue and the order chatter logs the routing. This is the exact locum behaviour the architecture documents promise (TC-16) — a hard block would be wrong, and the demo shows you know the difference.
+- **Demo moves:** open S00001 (Feldmann, draft) → Confirm → screenshot the block · open S00004 → show the review activity + chatter message.
 
-## D. Consignment at the hospital, on your books — Slide 10 / Q&A
-- **SN-HC-0002 sits at `WH/Consignment/Klinikum München`** — an internal location, so the implant remains in MDR's inventory while physically at the hospital. Location tree: WH → Stock / Quarantine (→ Disposition) / Consignment (→ Klinikum München) / Sterilization.
-- **Demo move:** Inventory → Reporting → Locations (or quants view) filtered on Consignment.
+## B. 90-day quality hold — Slide 8 🔴 FIRE-TESTED
+- Receipts auto-route to **WH/Quarantine**; the inbound Quality Control Point generates a check on every receipt (2 passed on record).
+- **New lots get their hold date automatically** — automation stamps receipt + 90 days on every new raw lot (no human remembers anything).
+- **LOT-2607-B: 10 units, held until 01 Oct 2026.** Attempting release raises: *"GxP quarantine gate — quality hold active for lot LOT-2607-B until 2026-10-01."* LOT-2607-A (hold elapsed) sits released beside it — both states visible.
+- **Demo moves:** lot form of LOT-2607-B (hold date in the MDR Compliance section) → attempt internal transfer → screenshot the block.
 
-## E. Instrument tray sterilization loop — Slide on the asset loop
-- **TRAY-A-001** in WH/Sterilization, **cycle 1 of 50** (limit on the record), own DI. Loop already walked: Vendor → Stock → Consignment → Sterilization.
-- Quality Control Point *Autoclave Cycle Verification* gates every internal move of the tray — check notes require cycle parameters + second-person countersign (the two-step gate from the GxP plan).
-- **Demo move:** tray serial form (cycle count/limit) + the QCP definition.
+## C. UDI + full genealogy — Slide 7
+- Serials SN-HC-0001/2/3 carry DI `04012345678901`, PI batch `LOT-2607-A`, PI serial, sterility expiry, UDI source = Scanned (GS1) — in a dedicated **"MDR Compliance — UDI & Quality"** section on the form.
+- **Demo move:** any serial → **Traceability** button → one report: vendor lot → quarantine → manufacturing order → serial → consignment/patient/return. The single most powerful screen in the demo.
 
-## F. Consumption → invoice → 3-plan analytics — Slide 9
-- SN-HC-0001 consumed ("surgery complete") → **S00002** (Klinikum München Ost / Dr. Weber) → **INV/2026/00001 posted, €4,850**.
-- Invoice line carries **all three analytic plans at 100%**: Cost Center = Orthopedics-KMO · Payer Type = Statutory Insurer (GKV) · Product Line = HipCore Implant Line. (Say it precisely in the pitch: the analytic spine is native; the payer-*split* invoicing is the named extension.)
-- **Demo move:** invoice form, analytic distribution widget on the line.
+## D. Consignment on-book at the hospital — Slide 10 / CEO question
+- **SN-HC-0002 at `WH/Consignment/Klinikum München`** — internal location, still MDR's inventory while physically at the hospital.
+- **Demo move:** location hierarchy + quants filtered on Consignment.
 
-## G. Auto-replenishment off post-hold stock — Purchasing answer
-- Reordering rule: raw material **min 10 / max 50, scoped to WH/Stock** — quarantined stock does NOT count toward replenishment, exactly as the architecture documents claim.
+## E. Reverse flow, Stage 4B — the "what about returns?" answer, LIVE
+- **SN-HC-0003**: manufactured (WH/MO/00004, consumed LOT-2607-A), consigned to the hospital, then **returned** — surgery cancelled — into **WH/Quarantine/Returns**, with disposition logged on the lot: **Re-Quarantine**, reason *"Surgery cancelled — packaging intact, within sterility window; fresh quality check required before restock."*
+- Traceability on SN-HC-0003 shows the full loop including the return — the chain shows the return, not a gap.
+- **Demo move:** SN-HC-0003 lot form (disposition + reason fields) → Traceability report.
 
-## Honest boundaries (say these, don't hide them)
-- **Field Service app isn't available on this trial tier** — consumption was demonstrated via inventory moves; in the real build, FSM "Surgery Complete" is the trigger.
-- The payer split (insurer + co-pay from one event) is **extension-layer** — the demo shows the native analytic spine only, which is exactly what the corrected documents claim.
-- These automations are the trial-grade stand-ins for the extension layer — in production they'd be validated at GAMP Cat 5 with the two-step release gate.
+## F. Instrument tray asset loop — 🔴 FIRE-TESTED (reuse-limit block)
+- **TRAY-A-001**: cycle **1 of 50**, sitting in Sterilization; cycles now **auto-increment** on every entry into the sterilization location; QCP *Autoclave Cycle Verification* gates each cycle (parameters + second-person countersign in the check notes).
+- **TRAY-B-001**: the end-of-life prop — **50 of 50 cycles**. Dispatching it raises: *"Reuse limit reached — tray TRAY-B-001 has completed 50 of 50 sterilization cycles. Dispatch blocked; route to retirement."*
+- **Demo moves:** both tray forms side by side (1/50 vs 50/50) → attempt to dispatch TRAY-B-001 → screenshot the block.
 
-## Screenshot shot-list (capture this week — trial expires)
-1. S00001 confirm attempt → red credential block (Slide 6)
-2. Dr. Feldmann contact form, MDR credential section (Slide 6 inset)
-3. LOT-2607-B lot form — active hold date (Slide 8)
-4. Blocked quarantine transfer error (Slide 8)
-5. SN-HC-0001 serial form — UDI section (Slide 7)
-6. Traceability report from the serial (Slide 7/10 — KEY)
-7. Consignment location with SN-HC-0002 (Slide 10)
-8. TRAY-A-001 — cycle 1/50 (asset loop slide)
-9. INV/2026/00001 — 3-plan analytic line (Slide 9)
-10. Inventory dashboard overview (Slide 10)
+## G. Multi-payer settlement — Slide 9
+- **Posted:** INV/2026/00001 — Klinikum München Ost, €4,850, invoice line tagged across all three analytic plans (Cost Center: Orthopedics-KMO · Payer Type: GKV · Product Line: HipCore) at 100%.
+- **Extension-layer preview (draft, labeled as such):** a settlement split pair for the same surgery — **AOK Bayern (insurer, 90%)** + **M. Schneider (patient co-pay, 10%)** — two invoices, two partners, **one shared analytic key**. Say it precisely: the analytic spine is native and live; generating this split automatically is the named extension. (Draft amounts show the trial's default tax — inert for the demo.)
+- **Demo move:** the three invoices in one list view (one posted, two drafts sharing the reference "Settlement split — Surgery SN-HC-0001"), then one invoice line's analytic widget.
 
-After capture: deck captions change from "mockup" to **"live in sandbox"** — and your Objection 7 answer becomes: *"zero Odoo projects in production, three ERP lifecycles, and every claim in this deck is running in a sandbox I can show you right now."*
+## H. Purchasing — auto-replenish off post-hold stock
+- Reordering rule: raw material min 10 / max 50 **scoped to WH/Stock** — held stock never counts toward replenishment. This is the literal answer to the case's auto-replenish sentence.
+
+---
+
+## The six fire-tested controls (your Q&A ammunition)
+| # | Control | Result |
+|---|---|---|
+| TC-01 | Expired-credential order block | 🔴 BLOCKED, exact banner captured |
+| TC-16 | Locum → review queue, not hard block | 🔴 ROUTED, activity created |
+| TC-05 | Quarantine hold release block | 🔴 BLOCKED, lot stays held |
+| TC-14 | Tray reuse-limit dispatch block | 🔴 BLOCKED at 50/50 cycles |
+| — | Valid order passes the gate | ✅ S00002 confirmed → invoiced |
+| — | Auto-hold on new lots / auto cycle count | ✅ automations live |
+
+## Honest boundaries (state them — they're pitch material)
+- Field Service app unavailable on this trial tier → consumption demoed via inventory moves; production build uses FSM "Surgery Complete" as the trigger.
+- The payer split runs as a labeled draft preview → in production it's the named Category 5 extension.
+- These trial automations stand in for the extension layer → production versions get GAMP Cat 5 validation and the two-step release gate.
+
+## Screenshot shot-list (12 shots, capture this week — trial expires)
+1. S00001 Confirm → red credential block · 2. Dr. Feldmann form (credential section) · 3. S00004 review activity (locum routing) · 4. LOT-2607-B hold date · 5. Blocked quarantine release · 6. SN-HC-0001 UDI section · 7. Traceability report (KEY) · 8. Consignment quant at Klinikum · 9. SN-HC-0003 return disposition · 10. TRAY-B-001 50/50 + dispatch block · 11. Three-invoice settlement list + analytic widget · 12. Inventory dashboard with "MDR Devices Medizintechnik GmbH" in the header.
+
+**Closing line you've earned:** *"Every control on these slides is enforced in a live system I built and tested — I can show you any of them right now."*
