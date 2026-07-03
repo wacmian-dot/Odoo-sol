@@ -1,0 +1,56 @@
+MDR DEVICES PITCH VIDEO — VOICE-OVER SCRIPT (timed)
+Record at a measured ~140 wpm. The two SILENCE windows are deliberate.
+
+[0:00 – 0:10]  (01_title)
+Every control in this video is enforced in a live system — the blocks you will see are real system refusals, not graphics.
+
+[0:10 – 0:38]  (02_challenge)
+MDR Devices runs four systems that each do their job — but an implant's journey crosses all four, and no system owns it. That white space is a standing EU MDR Article 27 exposure.
+
+[0:38 – 1:04]  (03_vision)
+One platform, one data model, one definition of compliant that every department inherits. Where standard Odoo stops short, we extend it deliberately — we don't sell zero custom code, we sell named custom code.
+
+[1:04 – 1:28]  (04_lotB)
+Every raw lot routes automatically into quarantine — there is no path around it — and the system stamps its 90-day quality hold the moment the lot is created. Nobody remembers the hold. Nobody tracks a spreadsheet.
+
+[1:28 – 1:36]  (05_holdblock_silent)
+** SILENCE — let the red banner hold the screen **
+
+[1:36 – 1:52]  (06_holdblock_callout)
+Watch what happens when someone tries to release this lot early — the system refuses. That is the difference between a procedure and a control.
+
+[1:52 – 2:16]  (07_serial)
+Released material becomes an implant — and at birth it receives its complete regulatory identity: Device Identifier, Production Identifier, batch linkage, sterility clock.
+
+[2:16 – 2:42]  (08_trace)
+This is the screen your auditor asks for: the complete genealogy of one implant — vendor lot to patient event, including the return — one click, zero reconstruction.
+
+[2:42 – 2:56]  (09_so_feldmann)
+Before any implant ships, the system asks the question nobody asks reliably today: is this surgeon still certified? Dr. Feldmann's certification lapsed in April. Let's try to confirm his order.
+
+[2:56 – 3:04]  (10_credblock_silent)
+** SILENCE — let the red banner hold the screen **
+
+[3:04 – 3:20]  (11_credblock_callout)
+His order cannot be confirmed. Not "shouldn't be" — cannot. Compliance is now a property of the sales process itself, not a training slide.
+
+[3:20 – 3:36]  (12_locum)
+And a visiting locum with no record yet isn't blocked — the order confirms but routes to a credential review queue, because a hard block there would be operationally wrong.
+
+[3:36 – 3:56]  (13_consign)
+At the hospital, consigned implants remain on your balance sheet — location-driven valuation an auditor can verify. And the whole operation reads from one screen: held, released, consigned, returned.
+
+[3:56 – 4:08]  (14_trays)
+Instrument trays run their own loop — every sterilization cycle counted automatically, gated by an autoclave quality check. This tray has one cycle. That one has fifty — its manufacturer's limit.
+
+[4:08 – 4:26]  (15_trayblock)
+When a tray reaches its reuse limit — watch — it refuses to ship. An over-cycled kit physically cannot reach an operating theatre.
+
+[4:26 – 4:52]  (16_invoice)
+Every invoice line carries three analytic dimensions from the moment it's generated. The payer split beside it comes from our named extension layer — we're precise about that boundary. The thread tying every payer document to one surgical event is native.
+
+[4:52 – 5:16]  (17_ask)
+Every control you just watched fire is running in a live system today. The ask is simple: a fixed-fee, three-week Discovery Sprint — and your decision within five business days.
+
+[5:16 – 5:26]  (18_end)
+** SILENCE — let the red banner hold the screen **

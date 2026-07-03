@@ -1,0 +1,59 @@
+1
+00:00:00,000 --> 00:00:09,000
+Every control in this video is enforced in a live system — the blocks you will see are real system refusals, not graphics.
+
+2
+00:00:10,000 --> 00:00:37,000
+MDR Devices runs four systems that each do their job — but an implant's journey crosses all four, and no system owns it. That white space is a standing EU MDR Article 27 exposure.
+
+3
+00:00:38,000 --> 00:01:03,000
+One platform, one data model, one definition of compliant that every department inherits. Where standard Odoo stops short, we extend it deliberately — we don't sell zero custom code, we sell named custom code.
+
+4
+00:01:04,000 --> 00:01:27,000
+Every raw lot routes automatically into quarantine — there is no path around it — and the system stamps its 90-day quality hold the moment the lot is created. Nobody remembers the hold. Nobody tracks a spreadsheet.
+
+5
+00:01:36,000 --> 00:01:51,000
+Watch what happens when someone tries to release this lot early — the system refuses. That is the difference between a procedure and a control.
+
+6
+00:01:52,000 --> 00:02:15,000
+Released material becomes an implant — and at birth it receives its complete regulatory identity: Device Identifier, Production Identifier, batch linkage, sterility clock.
+
+7
+00:02:16,000 --> 00:02:41,000
+This is the screen your auditor asks for: the complete genealogy of one implant — vendor lot to patient event, including the return — one click, zero reconstruction.
+
+8
+00:02:42,000 --> 00:02:55,000
+Before any implant ships, the system asks the question nobody asks reliably today: is this surgeon still certified? Dr. Feldmann's certification lapsed in April. Let's try to confirm his order.
+
+9
+00:03:04,000 --> 00:03:19,000
+His order cannot be confirmed. Not "shouldn't be" — cannot. Compliance is now a property of the sales process itself, not a training slide.
+
+10
+00:03:20,000 --> 00:03:35,000
+And a visiting locum with no record yet isn't blocked — the order confirms but routes to a credential review queue, because a hard block there would be operationally wrong.
+
+11
+00:03:36,000 --> 00:03:55,000
+At the hospital, consigned implants remain on your balance sheet — location-driven valuation an auditor can verify. And the whole operation reads from one screen: held, released, consigned, returned.
+
+12
+00:03:56,000 --> 00:04:07,000
+Instrument trays run their own loop — every sterilization cycle counted automatically, gated by an autoclave quality check. This tray has one cycle. That one has fifty — its manufacturer's limit.
+
+13
+00:04:08,000 --> 00:04:25,000
+When a tray reaches its reuse limit — watch — it refuses to ship. An over-cycled kit physically cannot reach an operating theatre.
+
+14
+00:04:26,000 --> 00:04:51,000
+Every invoice line carries three analytic dimensions from the moment it's generated. The payer split beside it comes from our named extension layer — we're precise about that boundary. The thread tying every payer document to one surgical event is native.
+
+15
+00:04:52,000 --> 00:05:15,000
+Every control you just watched fire is running in a live system today. The ask is simple: a fixed-fee, three-week Discovery Sprint — and your decision within five business days.
