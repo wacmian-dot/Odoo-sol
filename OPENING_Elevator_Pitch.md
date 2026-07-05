@@ -11,7 +11,7 @@ So my proposal is one validated definition of compliant, end to end — I call i
 
 Now — the case asked us to convey the look and feel of the future solution. I decided the only honest way to do that was to build it. So there's a live Odoo system behind this pitch. Try to confirm an order for a surgeon whose certification lapsed in April — the system refuses. Try to release a lot before its ninety-day hold — refused. Try to dispatch an instrument tray on its fiftieth sterilization cycle — refused. Those aren't slides; I can trigger any of them for you right now.
 
-Where the case was vague, I made grounded assumptions and labelled them — you'll find every one marked 'discovery-scoped' rather than dressed up as fact.
+Where the case was vague, I made grounded assumptions and labeled them — you'll find every one marked 'discovery-scoped' rather than dressed up as fact.
 
 And the part I find genuinely exciting: nobody at MDR Devices has to remember anything anymore. The system carries the compliance burden — the people get to do medicine and business. That's the pitch. Let me show you the thread."
 
@@ -25,7 +25,7 @@ And the part I find genuinely exciting: nobody at MDR Devices has to remember an
 | "coherence problem with regulatory consequences" | ~0:15 | Structured thinking — diagnosis before solution |
 | "I decided the only honest way… was to build it" | ~1:00 | Practicality over theory; results not reports |
 | The three refusals, spoken as a rhythm | ~1:15 | Client presence — the confident flex, offered not forced |
-| "grounded assumptions and labelled them" | ~1:40 | Intellectual honesty — owning the unknown |
+| "grounded assumptions and labeled them" | ~1:40 | Intellectual honesty — owning the unknown |
 | "nobody has to remember anything anymore" | Close | The excitement factor — employee-life framing, the much. register |
 
 **If asked about AI at any point:** "I used AI tooling as a force multiplier throughout — under my direction. Every technical claim was verified against the running system, and the audit trail of what the tooling got wrong and I corrected is part of my working papers. The judgment is mine; the leverage is the tool's." Then stop talking.
