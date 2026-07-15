@@ -1,0 +1,18 @@
+## Named risks and mitigations
+
+| # | Risk | Likelihood/Impact | Mitigation |
+|---|---|---|---|
+| 1 | **Deal structure ambiguity carries forward unresolved.** Proceeding on assumptions about equity vs. agency terms that turn out to be wrong. | High impact if unresolved — affects legal, funding, and personal liability | Resolve via Folder 13, Question 1 before signing anything or committing significant capital |
+| 2 | **The Polsat reference is false, and gets used before it's checked.** Real reputational/credibility damage if said to a prospect or even to RRUP and it doesn't hold up. | Medium likelihood (unverified), high impact if it happens | Do not use anywhere until RRUP confirms directly (Folder 13, Question 6) |
+| 3 | **A repeat of the Bart situation** — a future hire or partner misrepresenting information to either you or RRUP. | Medium likelihood given it's already happened once, high impact | Put commercial commitments in writing from the outset; verify claims independently where practical, as this package's discipline already models |
+| 4 | **Competing directly against a well-funded entrant (Reonic) and an entrenched UK-native leader (Payaca)** without a verified, demo-tested differentiation. | High likelihood of encountering both in deals, medium-high impact | Get real demo access and run the feature comparison in Folder 03 before finalising the pitch positioning in Folder 06 |
+| 5 | **50/50 deadlock, if the structure is an equity JV** — inability to agree on a material decision with no resolution mechanism. | Medium likelihood over a multi-year partnership, high impact | Insist on defined reserved matters and a deadlock-break clause in the written agreement (Folder 07) — do not proceed without one |
+| 6 | **UK product localisation gap** — MCS/DNO/ECO4 compliance fields, GBP/VAT handling not actually built, discovered mid-sales-cycle. | Medium likelihood, medium-high impact (kills deals in progress) | Confirm localisation status directly with RRUP (Folder 13, Question 7) before promising specific compliance features to a prospect |
+| 7 | **Demo/trial instance unreliable or unavailable** — the current `demo.salesopscrm.com` instance was found to be down at an infrastructure level during this research. | Already observed once — recurrence risk unknown | Confirm a stable demo/trial environment exists before it's needed for a live prospect call, not the day of |
+| 8 | **Funding assumptions don't match the real deal structure** — e.g. planning around a Start Up Loan sized for an equity JV when the real arrangement needs far less capital, or vice versa. | Medium likelihood, medium impact | Revisit Folder 08 only after Folder 13 is answered |
+| 9 | **Territorial exclusivity isn't actually granted, or is weaker than assumed** — building a UK business only to have RRUP work with someone else in the same market. | Unknown likelihood, high impact if it happens | Get exclusivity terms (if any) in writing as part of the agreement, not assumed from conversation (Folder 13, Question 8; Folder 07) |
+| 10 | **UK data protection compliance gap** — operating without proper ICO registration or a Data Processing Agreement covering data flow to RRUP's Polish/EU servers. | Low likelihood if addressed early, high impact if not (regulatory exposure) | Register with the ICO and put a DPA in place as part of company formation (Folder 07, §5) |
+
+## How to use this register
+
+Revisit it after every major milestone — after Folder 13's questions are answered, after the first live demo, after the first UK customer signs. Add new risks as they surface; don't treat this as a one-time exercise.
