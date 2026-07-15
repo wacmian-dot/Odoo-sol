@@ -173,13 +173,25 @@ Smoke test: `uid, models, common = conn(); print(uid, common.version()["server_s
 2. **`stock.move` has no `name` field** on saas~19.3 → `ValueError: Invalid field 'name' in 'stock.move'`. Omit `name`. Required create fields: `date`, `company_id`, `product_id`, `product_uom_qty`, `uom_id`, `location_id`, `location_dest_id`.
 3. **`stock.move.line`** has no `product_uom_id` and no `qty_done` → use `quantity` for the moved amount.
 4. **`base.automation` has no `state` field, and the action code lives in a separate `ir.actions.server`.** Build order: create the `ir.actions.server` (`state='code'`, `model_id=<M>`, `code=<verbatim>`) FIRST, then create the `base.automation` with `action_server_ids=[(6,0,[server_id])]`. The automation's fields: `trigger` (`'on_state_set'` or `'on_create'`), `trigger_field_ids=[(6,0,[<id of the model's 'state' field>])]` for state-set triggers, and `filter_domain` (a *string*, e.g. `"[('state','=','sale')]"`).
-5. **All numeric model/field IDs from the old system are void.** Old values were model_id 3184 (Sales Order), 3759 (Transfer/stock.picking), 3757 (Lot/Serial/stock.lot). **Resolve them fresh:**
+5. **All numeric model/field/record IDs from the old system are void.** Old values were model_id 3184 (Sales Order), 3759 (Transfer/stock.picking), 3757 (Lot/Serial/stock.lot). **Resolve everything fresh with these helpers (used throughout — never hardcode an id):**
    ```python
-   def model_id(ex, model):   # e.g. model_id(ex,'sale.order')
+   def model_id(ex, model):                     # e.g. model_id(ex,'sale.order')
        return ex('ir.model','search',[('model','=',model)])[0]
-   def field_id(ex, model, fname):
+   def field_id(ex, model, fname):              # the id of a field on a model (e.g. the 'state' field)
        return ex('ir.model.fields','search',[('model','=',model),('name','=',fname)])[0]
+   def rec_id(ex, model, name, field='name'):   # a record's id by its name/complete_name
+       r = ex(model,'search',[(field,'=',name)]); return r[0] if r else None
+   def loc_id(ex, complete_name):               # a stock.location id by complete_name (e.g. 'WH/Quarantine')
+       return rec_id(ex,'stock.location',complete_name,'complete_name')
+   def wh(ex):                                  # the default warehouse + its view location id
+       w = ex('stock.warehouse','search_read',[('id','>',0)], fields=['view_location_id','lot_stock_id','in_type_id','manu_type_id'])[0]
+       return w   # w['view_location_id'][0]=WH view loc, w['lot_stock_id'][0]=WH/Stock, w['in_type_id'][0]=Receipts type, w['manu_type_id'][0]=Manufacturing type
+   def seq_of_picking_type(ex, ptype_id):       # the ir.sequence id feeding a picking type's numbering
+       return ex('stock.picking.type','read',[ptype_id], fields=['sequence_id'])[0]['sequence_id'][0]
+   def seq_by_code(ex, code):                   # e.g. seq_by_code(ex,'sale.order'), seq_by_code(ex,'mrp.production')
+       r = ex('ir.sequence','search',[('code','=',code)]); return r[0] if r else None
    ```
+   **NOTE on `search_read`/`search_count` options:** pass options as **kwargs**, never as a trailing positional dict. Correct: `ex('res.partner','search_read',[('id','>',0)], fields=['name'], limit=5)`. WRONG: `ex('res.partner','search_read',[('id','>',0)], {'fields':['name']})` — the dict lands in the `fields` positional slot and raises `Invalid field 'fields'`. (Create/write take positional args and are unaffected.)
 6. **`stock.lot` has no `active` field** → cannot archive via API. **`stock.quant` unlink is permission-blocked** (`You are not allowed to delete 'Quant'`). To remove stray stock: use an inventory adjustment to zero it, or neutralise the lot (rename `ZZ-…`, push its dates far out) and leave it — but for an exact count, prefer never creating strays.
 7. **`cannot marshal None`** on some method returns → wrap with `mk_void`.
 8. **Custom fields are created via `ir.model.fields` create** (`state='manual'`, `name` must start with `x_`, set `ttype`). For Selection, set `selection_ids` (one `(0,0,{'value':<key>,'name':<label>,'sequence':N})` per option) — the **keys** must match the values the rule code and records use.
@@ -201,33 +213,38 @@ Run stages **in order** — dependencies are real (settings before data, fields 
 **VERIFY A:** `ex('ir.module.module','search_count',[('name','in',['stock','purchase','mrp','quality_control','sale_management','crm','account','stock_barcode']),('state','=','installed')])` == 8. A product form has a Traceability section; Inventory → Configuration shows Locations & Routes.
 
 ### Stage B — Locations (7, all internal)
-Resolve the warehouse view location (`WH`) and create the tree. All `usage='internal'`.
+`WH/Stock` already exists (`wh(ex)['lot_stock_id']`). Create the other 6 under the WH view location. All `usage='internal'`.
 
-| complete_name | parent |
+| Create (leaf name) | parent (`location_id`) → resolve with |
 |---|---|
-| WH/Stock | WH (exists by default) |
-| WH/Quarantine | WH |
-| WH/Quarantine/Disposition | WH/Quarantine |
-| WH/Quarantine/Returns | WH/Quarantine |
-| WH/Consignment | WH |
-| WH/Consignment/Klinikum München | WH/Consignment |
-| WH/Sterilization | WH |
+| Stock | (exists — `wh(ex)['lot_stock_id'][0]`) |
+| Quarantine | WH view loc = `wh(ex)['view_location_id'][0]` |
+| Disposition | `loc_id(ex,'WH/Quarantine')` |
+| Returns | `loc_id(ex,'WH/Quarantine')` |
+| Consignment | WH view loc |
+| Klinikum München | `loc_id(ex,'WH/Consignment')` |
+| Sterilization | WH view loc |
 
-Create each: `ex('stock.location','create',{'name':'Quarantine','location_id':<WH id>,'usage':'internal'})` etc. (name is the leaf; `complete_name` is derived).
+Create each: `ex('stock.location','create',{'name':'Quarantine','location_id':wh(ex)['view_location_id'][0],'usage':'internal'})` (name is the leaf; `complete_name` is derived — e.g. leaf "Klinikum München" under WH/Consignment renders `WH/Consignment/Klinikum München`). Create parents before children (Quarantine and Consignment before their sub-locations).
 Then set the **Receipts operation type default destination → WH/Quarantine** (load-bearing — makes quarantine unavoidable):
-`ex('stock.picking.type','write',[<receipts type id>],{'default_location_dest_id':<WH/Quarantine id>})`.
+```python
+recv = wh(ex)['in_type_id'][0]
+ex('stock.picking.type','write',[recv],{'default_location_dest_id':loc_id(ex,'WH/Quarantine')})
+```
 
-**VERIFY B:** all 7 locations exist with `usage='internal'`; Receipts type's `default_location_dest_id` is WH/Quarantine.
+**VERIFY B:** all 7 `complete_name`s exist with `usage='internal'`; Receipts type's `default_location_dest_id` is WH/Quarantine.
 
 ### Stage C — Analytics
 1. Create/confirm 3 plans: Cost Center, Payer Type, Product Line (`account.analytic.plan`). Odoo's default plan brings the count to 4.
 2. Create 3 analytic accounts, one under each plan: **Orthopedics-KMO** (Cost Center), **GKV** (Payer Type), **HipCore** (Product Line) — `account.analytic.account` with `plan_id` set.
-3. Capture the three plan ids — the invoice distribution keys on them.
+3. **Capture the three ANALYTIC-ACCOUNT ids** (not the plan ids): `acct_ids = [rec_id(ex,'account.analytic.account',n) for n in ['Orthopedics-KMO','GKV','HipCore']]`. The invoice line's `analytic_distribution` key is the comma-joined string of these three account ids (Stage I.7).
 
 **VERIFY C:** `account.analytic.plan` count == 4; `account.analytic.account` count == 3 with the three names above.
 
 ### Stage D — Products (3)
-Create per the 0.5 product table. Set product category "Goods" costing method → **Standard Price**. Standard costs: implant 1200, rod 120, tray 3000; implant sale price 4850. BoM: HipCore = 1 × Ti rod. Reorder rule (`stock.warehouse.orderpoint`) on the Ti rod: `product_min_qty=10`, `product_max_qty=50`, `location_id`=**WH/Stock**.
+> **Ordering prerequisite:** the Ti rod's vendor link points to **OrthoAlloy GmbH**, which is created in Stage H. Create the OrthoAlloy partner FIRST (`ex('res.partner','create',{'name':'OrthoAlloy GmbH','supplier_rank':1})`) so the `seller_ids`/`supplierinfo` link resolves here — the rest of Stage H's partners can stay in Stage H.
+
+Create per the 0.5 product table. Set product category "Goods" costing method → **Standard Price** (`ex('product.category','write',[rec_id(ex,'product.category','Goods')],{'property_cost_method':'standard'})`). Standard costs (`standard_price`): implant 1200, rod 120, tray 3000; implant `list_price` 4850. On the Ti rod set `seller_ids=[(0,0,{'partner_id':rec_id(ex,'res.partner','OrthoAlloy GmbH')})]`. BoM: HipCore = 1 × Ti rod (`mrp.bom` + `mrp.bom.line`). Reorder rule (`stock.warehouse.orderpoint`) on the Ti rod: `product_min_qty=10`, `product_max_qty=50`, `location_id`=`loc_id(ex,'WH/Stock')`.
 
 **VERIFY D:** 3 `product.template`; HipCore tracking=serial, use_expiration_date=True, expiration_time=730; rod reorder rule min10/max50 at WH/Stock; tray name contains "Instrument Tray".
 
@@ -241,14 +258,16 @@ Create via `ir.model.fields`. **res.partner (3):**
 - `x_hold_release_date` — Date, "Quality Hold Release"
 - `x_udi_di` — Char, "UDI — Device Identifier"
 - `x_udi_pi` — Char, "UDI — Production Identifier (composite)"  *(plain stored Char; NOT computed)*
-- `x_udi_pi_batch` — Char
-- `x_udi_pi_serial` — Char
-- `x_udi_pi_expiry` — Date
-- `x_udi_source` — Selection, keys: scan (Scanned (GS1)) / manual (Manual)
-- `x_sterilization_cycle_count` — Integer
-- `x_sterilization_cycle_limit` — Integer
-- `x_return_disposition` — Selection, keys: requarantine / scrap / rtv / under_investigation
-- `x_return_reason` — Char
+- `x_udi_pi_batch` — Char, "UDI PI — Batch (AI 10)"
+- `x_udi_pi_serial` — Char, "UDI PI — Serial (AI 21)"
+- `x_udi_pi_expiry` — Date, "UDI PI — Expiry (AI 17)"
+- `x_udi_source` — Selection, "UDI Source", keys: scan (Scanned (GS1)) / manual (Manual)
+- `x_sterilization_cycle_count` — Integer, "Sterilization Cycle Count"
+- `x_sterilization_cycle_limit` — Integer, "Sterilization Cycle Limit"
+- `x_return_disposition` — Selection, "Return Disposition", keys: requarantine (Re-Quarantine) / scrap (Scrap) / rtv (Return-to-Vendor) / under_investigation (Under Investigation)
+- `x_return_reason` — Char, "Return Reason"
+
+> Every field's `field_description` (label) is given above — always pass it on create (it is required). Selection fields also need `selection_ids` with the exact keys (see the pattern below).
 
 Selection create pattern:
 ```python
@@ -267,6 +286,18 @@ Place the built fields into an "MDR Compliance — UDI & Quality" section on the
 
 ### Stage F — The 4 automation rules (VERBATIM code)
 For each rule: create `ir.actions.server` (state='code', model_id, code = the exact block below), then `base.automation` with the trigger/domain given. Resolve `model_id`/state-`field_id` by lookup (quirk 5). After creation, dry-fire once (Part 4 fire-tests) and assert the exact message.
+
+> **`base.automation.name` is the FULL rule name WITHOUT the "Rule N — " prefix.** e.g. the first rule's `name` is exactly `"MDR Credential Gate — Block Confirm on Invalid HCP"` (matching `CANON["automations"]`). Do NOT include "Rule 1 — ". The `ir.actions.server.name` can be anything (e.g. the same text + " Code"); only the `base.automation.name` is audited.
+>
+> **Skeleton for each rule** (resolve ids with the helpers):
+> ```python
+> def make_rule(ex, rule_name, model, trigger, filter_domain, code):
+>     sa = ex('ir.actions.server','create',{'name':rule_name+' Code','model_id':model_id(ex,model),'state':'code','code':code})
+>     vals = {'name':rule_name,'model_id':model_id(ex,model),'trigger':trigger,'action_server_ids':[(6,0,[sa])]}
+>     if trigger=='on_state_set': vals['trigger_field_ids']=[(6,0,[field_id(ex,model,'state')])]
+>     if filter_domain: vals['filter_domain']=filter_domain
+>     return ex('base.automation','create',vals)
+> ```
 
 **Rule 1 — MDR Credential Gate — Block Confirm on Invalid HCP**
 model: `sale.order` · trigger: `on_state_set` · `filter_domain`: `"[('state','=','sale')]"` · `trigger_field_ids`: [state field of sale.order]
@@ -326,11 +357,22 @@ for picking in records:
 **VERIFY F:** `base.automation` count == 4 with the four exact names; each linked server action's `code` matches the block; the three refusal messages fire byte-exact (Part 4 fire-tests).
 
 ### Stage G — Quality control points (2)
-- **Inbound Implant Material Inspection** — on Receipts operation type, product = Ti rod, type Pass-Fail, instructions "Visual inspection · storage-condition / temperature-log review · certificate-of-analysis verification".
-- **Autoclave Cycle Verification** — on internal transfers of the tray; records cycle reference + parameters (temperature, duration, pressure); notes require a second-person countersign before redeploy.
-The transactional flow (Stage I) produces **3 quality.checks**, all passed.
+`quality.point` create dicts (resolve the picking-type and product ids with the helpers). `measure_on='operation'`, `test_type_id` = the "Pass - Fail" test type: `ptt = rec_id(ex,'quality.point.test_type','Pass - Fail')` — if that lookup misses on the trial, resolve via `ex('quality.point.test_type','search',[('technical_name','=','passfail')])[0]`.
+```python
+ti_rod = rec_id(ex,'product.product','Ti-6Al-4V Rod Stock (Raw)') or ex('product.product','search',[('name','like','Ti-6Al-4V')])[0]
+tray    = ex('product.product','search',[('name','like','Instrument Tray')])[0]
+recv    = wh(ex)['in_type_id'][0]
+internal= ex('stock.picking.type','search',[('code','=','internal')])[0]
+ex('quality.point','create',{'title':'Inbound Implant Material Inspection','product_ids':[(6,0,[ti_rod])],
+    'picking_type_ids':[(6,0,[recv])],'measure_on':'operation','test_type_id':ptt,
+    'note':'Visual inspection · storage-condition / temperature-log review · certificate-of-analysis verification'})
+ex('quality.point','create',{'title':'Autoclave Cycle Verification','product_ids':[(6,0,[tray])],
+    'picking_type_ids':[(6,0,[internal])],'measure_on':'operation','test_type_id':ptt,
+    'note':'Record autoclave cycle reference + parameters (temperature, duration, pressure); second-person countersign required before redeploy'})
+```
+The transactional flow (Stage I) produces **3 quality.checks**, all passed (pass a check with `ex('quality.check','write',[cid],{'quality_state':'pass'})` or the `do_pass()` method).
 
-**VERIFY G:** `quality.point` count == 2; after Stage I, `quality.check` count == 3 all pass.
+**VERIFY G:** `quality.point` count == 2; after Stage I, `quality.check` count == 3, all `quality_state='pass'`.
 
 ### Stage H — Partners (7 named)
 Create OrthoAlloy GmbH (supplier), Klinikum München Ost (customer, is_company), AOK Bayern (customer), M. Schneider (individual), and the 3 physicians with the exact credential values from 0.5 (Feldmann expired/DE-ORT-4471/2026-04-30; Weber validated/DE-ORT-5512/2027-12-31; Okafor pending_verification). Link Feldmann to Klinikum if desired (cosmetic).
@@ -338,22 +380,24 @@ Create OrthoAlloy GmbH (supplier), Klinikum München Ost (customer, is_company),
 **VERIFY H:** the 7 named partners exist; the 3 physicians carry the exact `x_validation_state` keys + cert fields.
 
 ### Stage I — Transactional choreography
-**Sequence management FIRST** (document numbers are canonical):
-- Set the Receipts sequence so the OrthoAlloy 10-unit receipt becomes **WH/IN/00002** (either advance `ir.sequence.number_next` to 2, or let WH/IN/00001 be an earlier receipt).
-- Ensure SN-HC-0003's manufacturing order is **WH/MO/00004** (the flow creates 4 MOs; number so the 4th makes SN-HC-0003).
-- Sales: create S00001 (Feldmann), S00002 (Weber), a **throwaway S00003 then delete it** so the next order is S00004 (reproduces record IDs 1,2,4 and the S00003 name gap). Primary method: create S00003 and `unlink` it. Fallback if unlink is blocked on the trial: bump the SO `ir.sequence.number_next` from 3 to 4 before creating Okafor's order.
+**Sequence management FIRST** (document numbers are canonical; resolve every sequence with the helpers — never guess an id):
+- **Receipts (WH/IN):** `ex('ir.sequence','write',[seq_of_picking_type(ex, wh(ex)['in_type_id'][0])],{'number_next_actual':2})` so the OrthoAlloy 10-unit receipt is **WH/IN/00002**. (Alternatively let an earlier throwaway receipt consume WH/IN/00001.)
+- **MOs (WH/MO):** ensure SN-HC-0003's MO is **WH/MO/00004** — the flow creates 4 MOs (see step 3 topology); set `ex('ir.sequence','write',[seq_of_picking_type(ex, wh(ex)['manu_type_id'][0])],{'number_next_actual':1})` before the first MO so numbering runs 1→4 cleanly.
+- **Sales (S):** create S00001 (Feldmann), S00002 (Weber), a **throwaway S00003 then delete it** so Okafor's order lands as **S00004** (reproduces record ids 1,2,4 and the S00003 name gap). Primary: create S00003, `ex('sale.order','unlink',[id])`. Fallback if unlink is blocked: `ex('ir.sequence','write',[seq_by_code(ex,'sale.order')],{'number_next_actual':4})` before creating Okafor's order.
 
 Then, each step immediately VERIFY'd against 0.5:
-1. **PO → OrthoAlloy**, receive **10 units** → receipt **WH/IN/00002**, lot **LOT-2607-B** lands in WH/Quarantine (Auto Quality Hold fires, stamps a +90d date — corrected later in step 10). Pass the Inbound QC check.
-2. **Second raw receipt, 20 units → LOT-2607-A**; pass QC; release to WH/Stock.
-3. **4 manufacturing orders** consuming LOT-2607-A → produce **SN-HC-0001**, **SN-HC-0002**, and (as **WH/MO/00004**) **SN-HC-0003**. For each finished serial write: `x_udi_di`='04012345678901', `x_udi_pi`=the per-serial composite (0.5), `x_udi_pi_batch`='LOT-2607-A', `x_udi_pi_serial`=the serial name, `x_udi_pi_expiry`=2028-07-01 (0001/0002) or 2028-07-02 (0003), `x_udi_source`='scan', `use_expiration_date`=True.
+1. **PO → OrthoAlloy**, receive **10 units** → receipt **WH/IN/00002**, lot **LOT-2607-B** lands in WH/Quarantine (Auto Quality Hold fires, stamps a +90d date — corrected in step 10). Pass the Inbound QC check.
+2. **Second raw receipt, 20 units → LOT-2607-A** → also lands in WH/Quarantine and gets auto-stamped a +90d hold. **Before releasing it, override its hold to a past date** (`ex('stock.lot','write',[lotA_id],{'x_hold_release_date':'2026-07-02'})`) — otherwise **Rule 2 (already live) will block the Quarantine→Stock transfer** because the auto-stamped hold is in the future. Pass its QC, then create+validate an internal transfer LOT-2607-A → **WH/Stock** (now permitted).
+3. **4 manufacturing orders** consuming LOT-2607-A, numbered WH/MO/00001…00004. **Topology (spell it out — needed to hit `mrp.production`=4 with only 3 surviving serials):** WH/MO/00001 → produces **SN-HC-0001**; WH/MO/00002 → produces **SN-HC-0002**; **WH/MO/00003 = a padding MO** (created and left in `draft`/`confirmed`, no finished serial — it exists only to advance the sequence so the next MO is 00004; it consumes nothing and produces nothing); WH/MO/00004 → produces **SN-HC-0003**. (Each producing MO backflushes 1 × LOT-2607-A → 1 finished serial; mark it done.) For each of the 3 finished serials write: `x_udi_di`='04012345678901', `x_udi_pi`=the per-serial composite (0.5), `x_udi_pi_batch`='LOT-2607-A', `x_udi_pi_serial`=the serial name, `x_udi_pi_expiry`=2028-07-01 (0001/0002) or 2028-07-02 (0003), `x_udi_source`='scan', `use_expiration_date`=True.
 4. **Consign SN-HC-0002** → internal transfer to WH/Consignment/Klinikum München. VERIFY €1,200 on-book, location usage=internal.
-5. **Consume SN-HC-0001** at surgery — inventory move (T-14 SIMULATED; Field Service is off-tier).
-6. **Sales orders:** S00001 for Feldmann (1 × HipCore, €4,850) — attempt Confirm ONCE (the credential gate blocks it → message logged in chatter), leave it in **draft**. Confirm S00002 for Weber (€4,850 → this is the invoiced surgery). Create+delete throwaway S00003. Create S00004 for Okafor and Confirm (routes to review — a "HCP credential verification required" activity is created; order state = sale). **S00004 total: see STOP-AND-ASK #1** — build one €4,850 line for now and flag, unless the user has supplied the composition for €5,820.
-7. **Invoicing:** post **INV/2026/00001** from Weber's SO — one line, `analytic_distribution` = `{"<Orthopedics-KMO acct id>,<GKV acct id>,<HipCore acct id>": 100.0}` (the key is a comma-joined string of the three analytic-account ids; resolve them). Then create **2 draft** settlement-split invoices with ref **"Settlement split — Surgery SN-HC-0001"**: AOK Bayern at 90% and M. Schneider at 10%, both carrying the same analytic distribution. Leave both in **draft** (extension-layer preview).
-8. **Trays:** create TRAY-A-001 and TRAY-B-001 (serials on the Instrument Tray (Loaner) product). Run ONE real sterilisation-loop transfer for TRAY-A-001 (so chatter shows the auto-count mechanism), then set `x_sterilization_cycle_count`=1, `x_sterilization_cycle_limit`=50. Set TRAY-B-001 to 50/50. Attempt to dispatch TRAY-B-001 to consignment ONCE → the reuse-limit refusal fires and is logged; leave the tray undispatched.
+5. **Consume SN-HC-0001** at surgery — inventory move to a customer/consumed location (T-14 SIMULATED; Field Service is off-tier).
+6. **Sales orders:** S00001 for Feldmann (1 × HipCore, €4,850) — attempt Confirm ONCE (the credential gate blocks it → message logged in chatter), leave it in **draft**. Confirm S00002 for Weber (€4,850 → this is the invoiced surgery). Create+delete throwaway S00003. Create S00004 for Okafor and Confirm (routes to review — a "HCP credential verification required" activity is created; order state = sale). **S00004 total: STOP-AND-ASK #1** — build ONE €4,850 HipCore line for now; the audit will show it ⚠ pending the user's answer on the €5,820 composition (`amount_total` is a computed field — do NOT try to write 5820 directly; add/adjust order LINES once the user supplies the composition).
+7. **Invoicing:** post **INV/2026/00001** from Weber's SO — one invoice line, `analytic_distribution` = `{",".join(str(a) for a in acct_ids): 100.0}` where `acct_ids` are the 3 analytic-account ids from Stage C (key is the comma-joined string of the three account ids). Then create **2 draft** `account.move` invoices (`move_type='out_invoice'`, `state` left draft) with `ref="Settlement split — Surgery SN-HC-0001"`: one to **AOK Bayern** (line ~90% of 4850 = 4365.00), one to **M. Schneider** (line ~10% = 485.00), both carrying the same `analytic_distribution`. Leave both **draft** (extension-layer preview).
+8. **Trays:** create TRAY-A-001 and TRAY-B-001 (serials on the Instrument Tray (Loaner) product). Run ONE real sterilisation-loop transfer for TRAY-A-001 into WH/Sterilization (so chatter shows the auto-count mechanism — the rule increments it to 1), then set `x_sterilization_cycle_count`=1, `x_sterilization_cycle_limit`=50. Set TRAY-B-001 to `x_sterilization_cycle_count`=50, `x_sterilization_cycle_limit`=50. Attempt to dispatch TRAY-B-001 to a Consignment location ONCE → the reuse-limit refusal fires and is logged; leave the tray at WH/Stock, undispatched.
 9. **Return flow:** move SN-HC-0003 to WH/Quarantine/Returns; set `x_return_disposition`='requarantine' and `x_return_reason`=the exact text in 0.5.
 10. **Apply canonical date overrides** (0.6): overwrite LOT-2607-B hold → 2026-10-01, LOT-2607-A hold → 2026-07-02, serial expiries → 2028-07-01/02. Final VERIFY: hero records == 0.5, counts == 0.5.
+
+> **Expected `account.move.line` = 8 breakdown** (so you can hit the count): INV/2026/00001 = 1 product line + 1 receivable line (2); AOK Bayern draft = 1 product + 1 receivable (2); M. Schneider draft = 1 product + 1 receivable (2); plus the 2 lines Odoo auto-adds for tax/rounding across the set as applicable — if your count lands at 6, the two split invoices likely posted without a tax line; if it lands at 9+, an extra invoice or line crept in. The audit reports the number; the remediation is to inspect `account.move.line` names and add/remove to reach 8. This count is the softest target in the build — treat a ±1 as acceptable if every named record and value is otherwise ✅, and note it in the final report rather than forcing a stray line.
 
 ---
 
@@ -425,6 +469,15 @@ CANON = {
     "Weber":    {"x_validation_state":"validated","x_hcp_certification_number":"DE-ORT-5512","x_hcp_certification_expiry":"2027-12-31"},
     "Okafor":   {"x_validation_state":"pending_verification"}},
   "invoice": {"INV/2026/00001": {"state":"posted","amount_total":4850.0}},
+  # The two extension-layer preview drafts for the same surgery. amount_total is NOT
+  # asserted (trial-default tax makes it non-canonical, like S00004) — only existence,
+  # draft state, partner, and the shared ref are checked.
+  "settlement_split": {"ref":"Settlement split — Surgery SN-HC-0001",
+                       "partners":["AOK Bayern","M. Schneider"], "count":2, "state":"draft"},
+  # INV/2026/00001's single line must carry 100% analytic distribution across the 3
+  # analytic-account ids (resolved by name at audit time — ids are instance-specific).
+  "posted_invoice_analytic": {"invoice":"INV/2026/00001", "pct_total":100.0,
+                              "accounts":["Orthopedics-KMO","GKV","HipCore"]},
   "automations": ["MDR Credential Gate — Block Confirm on Invalid HCP",
                   "GxP Quarantine Hold — Block Release Before Hold Elapses",
                   "Auto Quality Hold — 90 Days on New Raw Lots",
@@ -456,54 +509,91 @@ from api import conn, mk
 # paste CANON = {...} here (4.2)
 
 uid, models, common = conn(); ex = mk(models, uid)
-ok = bad = 0
+ok = bad = warn = 0
 def check(label, got, want):
     global ok, bad
     passed = (got == want)
     print(("✅" if passed else "❌"), f"{label:52s} got={got!r} want={want!r}")
     ok += passed; bad += (not passed)
+def warn_line(label, got):
+    global warn
+    print("⚠", f"{label:52s} got={got!r}  (STOP-AND-ASK — not auto-repaired)")
+    warn += 1
+
+# IMPORTANT: every search_read/search_count options dict below is passed as KWARGS
+# (fields=[...], limit=...), never as a trailing positional dict — see Part 1.2 quirk note.
 
 # counts
 for m, n in CANON["counts"].items():
     check(f"count {m}", ex(m,"search_count",[('id','>',0)]), n)
 # custom fields present
 for model, names in CANON["custom_fields"].items():
-    have = ex('ir.model.fields','search_read',[('model','=',model),('name','like','x_')],{'fields':['name']})
+    have = ex('ir.model.fields','search_read',[('model','=',model),('name','like','x_')], fields=['name'])
     haveset = {f['name'] for f in have}
     for nm in names: check(f"field {model}.{nm}", nm in haveset, True)
 # excluded fields absent
 for model, names in CANON["must_not_exist_fields"].items():
-    have = {f['name'] for f in ex('ir.model.fields','search_read',[('model','=',model),('name','like','x_')],{'fields':['name']})}
+    have = {f['name'] for f in ex('ir.model.fields','search_read',[('model','=',model),('name','like','x_')], fields=['name'])}
     for nm in names: check(f"EXCLUDED {model}.{nm} absent", nm not in have, True)
-# sale orders
+# sale orders — S00004's amount_total is STOP-AND-ASK #1 (computed field, line
+# composition unknown); report state normally but WARN on the total instead of ❌.
 for name, exp in CANON["sale_orders"].items():
-    r = ex('sale.order','search_read',[('name','=',name)],{'fields':['state','amount_total']})
-    check(f"SO {name}", (r and {'state':r[0]['state'],'amount_total':r[0]['amount_total']}) or None, exp)
+    r = ex('sale.order','search_read',[('name','=',name)], fields=['state','amount_total'])
+    if name == "S00004":
+        check(f"SO {name} state", (r[0]['state'] if r else None), exp['state'])
+        if r and r[0]['amount_total'] == exp['amount_total']:
+            check(f"SO {name} amount_total", r[0]['amount_total'], exp['amount_total'])
+        else:
+            warn_line(f"SO {name} amount_total", r[0]['amount_total'] if r else None)
+    else:
+        got = (r and {'state':r[0]['state'],'amount_total':r[0]['amount_total']}) or None
+        check(f"SO {name}", got, exp)
 # lots/serials
 for name, exp in CANON["lots"].items():
     fields=list(exp.keys())
-    r = ex('stock.lot','search_read',[('name','=',name)],{'fields':fields})
+    r = ex('stock.lot','search_read',[('name','=',name)], fields=fields)
     got = {k:(r[0].get(k) if r else None) for k in fields}
     check(f"lot {name}", got, exp)
 # physicians
 for key, exp in CANON["physicians"].items():
     fields=list(exp.keys())
-    r = ex('res.partner','search_read',[('name','like',key)],{'fields':fields})
+    r = ex('res.partner','search_read',[('name','like',key)], fields=fields)
     got = {k:(r[0].get(k) if r else None) for k in fields}
     check(f"physician {key}", got, exp)
-# invoice
+# invoice (posted hero)
 for name, exp in CANON["invoice"].items():
-    r = ex('account.move','search_read',[('name','=',name)],{'fields':['state','amount_total']})
+    r = ex('account.move','search_read',[('name','=',name)], fields=['state','amount_total'])
     check(f"invoice {name}", (r and {'state':r[0]['state'],'amount_total':r[0]['amount_total']}) or None, exp)
+# settlement-split drafts (extension-layer preview) — existence/state/partner/ref only
+ss = CANON["settlement_split"]
+drafts = ex('account.move','search_read',[('ref','=',ss['ref'])], fields=['state','partner_id'])
+check("settlement-split count", len(drafts), ss['count'])
+check("settlement-split all draft", all(d['state']=='draft' for d in drafts), True)
+draft_partner_names = {d['partner_id'][1] for d in drafts if d.get('partner_id')}
+for p in ss['partners']:
+    check(f"settlement-split partner {p}", any(p in n for n in draft_partner_names), True)
+# posted-invoice analytic_distribution: 100% across the 3 resolved analytic-account ids
+pia = CANON["posted_invoice_analytic"]
+acct_ids = []
+for nm in pia['accounts']:
+    r = ex('account.analytic.account','search_read',[('name','=',nm)], fields=['id'])
+    acct_ids.append(r[0]['id'] if r else None)
+inv = ex('account.move','search_read',[('name','=',pia['invoice'])], fields=['id'])
+lines = ex('account.move.line','search_read',[('move_id','=',inv[0]['id']),('display_type','=',False)], fields=['analytic_distribution']) if inv else []
+dist = lines[0]['analytic_distribution'] if lines else {}
+dist_ids = {int(k) for k in (dist or {}).keys()}
+pct_sum = sum((dist or {}).values())
+check("posted invoice analytic covers 3 accounts", acct_ids and dist_ids == set(acct_ids), True)
+check("posted invoice analytic sums to 100%", round(pct_sum,2) if dist else None, pia['pct_total'])
 # automations
-autos = {a['name'] for a in ex('base.automation','search_read',[('id','>',0)],{'fields':['name']})}
+autos = {a['name'] for a in ex('base.automation','search_read',[('id','>',0)], fields=['name'])}
 for nm in CANON["automations"]: check(f"automation {nm[:30]}", nm in autos, True)
 # analytic accounts
-accts = {a['name'] for a in ex('account.analytic.account','search_read',[('id','>',0)],{'fields':['name']})}
+accts = {a['name'] for a in ex('account.analytic.account','search_read',[('id','>',0)], fields=['name'])}
 for nm in CANON["analytic_accounts"]: check(f"analytic acct {nm}", nm in accts, True)
 # locations internal
 for cn in CANON["locations"]:
-    r = ex('stock.location','search_read',[('complete_name','=',cn)],{'fields':['usage']})
+    r = ex('stock.location','search_read',[('complete_name','=',cn)], fields=['usage'])
     check(f"loc {cn}", (r[0]['usage'] if r else None), "internal")
 # document numbers exist (across models)
 for dn in CANON["doc_numbers"]:
@@ -511,9 +601,31 @@ for dn in CANON["doc_numbers"]:
              or ex('mrp.production','search_count',[('name','=',dn)]) or ex('account.move','search_count',[('name','=',dn)]))
     check(f"doc# {dn}", bool(found), True)
 
-print(f"\n{'ALL ✅' if bad==0 else '❌ FAILURES'} ({ok}/{ok+bad})")
+print(f"\n{'ALL ✅' if bad==0 else '❌ FAILURES'} ({ok}/{ok+bad})  ⚠ warnings (STOP-AND-ASK, not auto-repaired): {warn}")
 ```
-**Fire-tests** (run separately; assert the exact strings in `CANON['refusals']`): attempt to confirm S00001 → credential message; attempt LOT-2607-B release → quarantine message; attempt TRAY-B-001 dispatch → tray message. Each must raise a `UserError` whose text equals the canonical string exactly (clean up any draft transfer/attempt afterwards).
+**Fire-tests** (run separately — a real `xmlrpc.client.Fault` from `execute_kw` cannot be asserted with `==`; the transport wraps the `UserError` text inside `faultString` alongside a traceback header, so match by **substring**):
+```python
+import xmlrpc.client
+from api import conn, mk
+uid, models, common = conn(); ex = mk(models, uid)
+
+def fire_test(label, action, expect_substring):
+    try:
+        action()
+        print("❌", label, "— expected a blocking Fault, none raised")
+    except xmlrpc.client.Fault as f:
+        hit = expect_substring in f.faultString
+        print(("✅" if hit else "❌"), label, "— substring", "found" if hit else "MISSING", f"(expected: {expect_substring[:60]}...)")
+
+so1 = rec_id(ex, 'sale.order', 'S00001')
+lotB = rec_id(ex, 'stock.lot', 'LOT-2607-B')
+trayB = rec_id(ex, 'stock.lot', 'TRAY-B-001')
+
+fire_test("credential gate (S00001 confirm)", lambda: ex('sale.order','action_confirm',[so1]), CANON['refusals']['credential'])
+# LOT-2607-B release / TRAY-B-001 dispatch fire-tests are executed as the internal-transfer
+# attempts described in Stage F/Part 3; wrap each transfer's `button_validate` call the same
+# way, matching CANON['refusals']['quarantine'] / CANON['refusals']['tray'] by substring.
+```
 
 ### 4.4 REMEDIATION TABLE — for each ❌, the exact repair
 | ❌ Symptom | Deterministic repair |
@@ -531,6 +643,9 @@ print(f"\n{'ALL ✅' if bad==0 else '❌ FAILURES'} ({ok}/{ok+bad})")
 | Analytic distribution missing/wrong | `write` `analytic_distribution` on the invoice line = `{"<3 acct ids joined by comma>":100.0}` |
 | Location missing / not internal | Create/fix the `stock.location` (usage=internal, correct parent) |
 | Physician state/cert wrong | `write` the exact `CANON['physicians']` values |
+| Analytic account missing (Orthopedics-KMO/GKV/HipCore not found) | Re-run Stage C's `account.analytic.account` create for the missing name(s) under the correct plan; re-resolve `acct_ids` and re-write `analytic_distribution` |
+| Settlement-split draft missing/wrong (count/state/partner/ref) | Re-run Stage I.7's two draft-invoice creates with the exact ref `"Settlement split — Surgery SN-HC-0001"` and partners AOK Bayern (90%)/M. Schneider (10%) |
+| SO S00004 amount_total ⚠ (does not match 5820.0) | **Not auto-repaired** — this is STOP-AND-ASK #1 (computed field, line composition unknown). Do not guess a line breakdown; halt and ask the user per Part 6 |
 
 ### 4.5 The heal loop
 ```
